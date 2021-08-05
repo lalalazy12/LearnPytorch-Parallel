@@ -19,6 +19,7 @@
             return
 
         if device_ids is None:
+        //--------------------2--------------------
             device_ids = _get_all_device_indices()
         //------Store output in device[0]------
         if output_device is None:
@@ -47,7 +48,46 @@
     `is_availabel`:
     `return torch._C._cuda_getDeviceCount() > 0`
 
+2. _get_all_device_indices():
+    # all device index
+    return _get_device_attr(lambda m: list(range(m.device_count()))) 
+    get a device list
+    ```
+    def _get_all_device_indices():
+        # all device index
+        return _get_device_attr(lambda m: list(range(m.device_count())))
+    ```
 
+### Forward
+
+```
+def forward(self, *inputs, **kwargs):
+    with torch.autograd.profiler.record_function("DataParallel.forward"):
+
+        //--------------------1--------------------
+        //----check if server(device[0]) has all parameters and buffer---- 
+        for t in chain(self.module.parameters(), self.module.buffers()):
+            if t.device != self.src_device_obj:
+                raise RuntimeError("module must have its parameters and buffers "
+                                    "on device {} (device_ids[0]) but found one of "
+                                    "them on device: {}".format(self.src_device_obj, t.device))
+
+        inputs, kwargs = self.scatter(inputs, kwargs, self.device_ids)
+        # for forward function without any inputs, empty list and dict will be created
+        # so the module can be executed on one device which is the first one in device_ids
+        if not inputs and not kwargs:
+            inputs = ((),)
+            kwargs = ({},)
+
+        if len(self.device_ids) == 1:
+            return self.module(*inputs[0], **kwargs[0])
+        replicas = self.replicate(self.module, self.device_ids[:len(inputs)])
+        outputs = self.parallel_apply(replicas, inputs, kwargs)
+        return self.gather(outputs, self.output_device)
+```
+
+
+Before running, GPU device_ids[0] (that is, our server) must have parallelized module parameters and buffers
 
 
 
