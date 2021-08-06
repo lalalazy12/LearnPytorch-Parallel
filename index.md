@@ -86,6 +86,7 @@ def forward(self, *inputs, **kwargs):
         replicas = self.replicate(self.module, self.device_ids[:len(inputs)])
         //--------------------4--------------------
         outputs = self.parallel_apply(replicas, inputs, kwargs)
+        //--------------------5--------------------
         return self.gather(outputs, self.output_device)
 ```
 
@@ -345,12 +346,84 @@ def forward(self, *inputs, **kwargs):
     2. Replicate module's network structure, parameters and buffers
 
 4. parallel_apply
+
     Both Distributed Paralle and Distributed Data Parallel use this API.
 
     ```
         def parallel_apply(self, replicas, inputs, kwargs):
             return parallel_apply(replicas, inputs, kwargs, self.device_ids[:len(replicas)])
     ```
+    Applies each `module` in `modules` in parallel on arguments contained in `inputs` and `kwargs_tup` (keyword) on each of `devices`.
+
+    Args:
+        - modules (Module): modules to be parallelized
+        - inputs (tensor): inputs to the modules
+        - devices (list of int or torch.device): CUDA devices
+
+    `modules`,`inputs`,`kwargs_tup`, and`devices` should all have same length. Moreover, each
+    element of `inputs` can either be a single object as the only argument
+    to a module, or a collection of positional arguments.
+  
+    ```
+    def parallel_apply(modules, inputs, kwargs_tup=None, devices=None):
+    devices = [_get_device_index(x, True) for x in devices]
+    lock = threading.Lock()
+    results = {}
+    grad_enabled, autocast_enabled = torch.is_grad_enabled(), torch.is_autocast_enabled()
+
+    def _worker(i, module, input, kwargs, device=None):
+        torch.set_grad_enabled(grad_enabled)
+        if device is None:
+            device = get_a_var(input).get_device()
+        try:
+            //----------tip 1: what is with torch.cuda.device()----------
+            with torch.cuda.device(device), autocast(enabled=autocast_enabled):
+                # this also avoids accidental slicing of `input` if it is a Tensor
+                if not isinstance(input, (list, tuple)):
+                    input = (input,)
+                //----------in each thread: forward ----------
+                output = module(*input, **kwargs)
+            with lock:
+                results[i] = output
+        except Exception:
+            with lock:
+                results[i] = ExceptionWrapper(
+                    where="in replica {} on device {}".format(i, device))
+
+
+    if len(modules) > 1:
+        //----------init multi thread ----------
+        threads = [threading.Thread(target=_worker,
+                                    args=(i, module, input, kwargs, device))
+                   for i, (module, input, kwargs, device) in
+                   enumerate(zip(modules, inputs, kwargs_tup, devices))]
+
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+    else:
+        _worker(0, modules[0], inputs[0], kwargs_tup[0], devices[0])
+
+    outputs = []
+    for i in range(len(inputs)):
+        output = results[i]
+        if isinstance(output, ExceptionWrapper):
+            output.reraise()
+        //----------get all result ----------
+        outputs.append(output)
+    return outputs
+    ```
+    [tip 1](https://stackoverflow.com/questions/52076815/pytorch-use-device-inside-with-statement): 
+    
+    it can just be used to switch between cuda devices, not copy data from one device to another device (e.g. copy from cpu to gpu ). And [method](https://stackoverflow.com/questions/48152674/how-to-check-if-pytorch-is-using-the-gpu) to get current device.
+
+5. Gather outputs
+Gather all outputs to device[0]
+
+
+
+
 
 
 ## Welcome to GitHub Pages
