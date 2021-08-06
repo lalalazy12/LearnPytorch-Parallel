@@ -170,10 +170,6 @@ class Scatter(Function):
 
 3. 
 
-```
-    def parallel_apply(self, replicas, inputs, kwargs):
-        return parallel_apply(replicas, inputs, kwargs, self.device_ids[:len(replicas)])
-```
 
 ```
 def replicate(network, devices, detach=False):
@@ -319,13 +315,20 @@ def replicate(network, devices, detach=False):
                 return (None,) + ReduceAddCoalesced.apply(ctx.input_device, ctx.num_inputs, *grad_outputs)
         ```
     2. broadcast_coalesced
+
         Broadcasts a sequence tensors to the specified GPUs. Small tensors are first coalesced into a buffer to reduce the number of synchronizations.
+
             Args:
                 tensors (sequence): tensors to broadcast. Must be on the same device, either CPU or GPU. 
+
                 devices (Iterable[torch.device, str or int]): an iterable of GPU devices, among which to broadcast. 
+
                 buffer_size (int): maximum size of the buffer used for coalescing
+
             Returns:
+
                 A tuple containing copies of :attr:`tensor`, placed on :attr:`devices`.
+
         ```
         def broadcast_coalesced(tensors, devices, buffer_size=10485760):
             """
@@ -335,6 +338,10 @@ def replicate(network, devices, detach=False):
         ```
 
 
+```
+    def parallel_apply(self, replicas, inputs, kwargs):
+        return parallel_apply(replicas, inputs, kwargs, self.device_ids[:len(replicas)])
+```
 
 
 ## Welcome to GitHub Pages
