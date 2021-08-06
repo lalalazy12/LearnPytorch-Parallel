@@ -188,6 +188,7 @@ def replicate(network, devices, detach=False):
     //--------------------1--------------------
     param_copies = _broadcast_coalesced_reshape(params, devices, detach)
 
+    //----------replicate buffers----------
     buffers = list(network.buffers())
     buffers_rg = []
     buffers_not_rg = []
@@ -197,9 +198,11 @@ def replicate(network, devices, detach=False):
         else:
             buffers_not_rg.append(buf)
 
+    //----------record buffers(require grad or not)----------
     buffer_indices_rg = {buf: idx for idx, buf in enumerate(buffers_rg)}
     buffer_indices_not_rg = {buf: idx for idx, buf in enumerate(buffers_not_rg)}
 
+    //----------boadcast buffers(like 1)----------
     buffer_copies_rg = _broadcast_coalesced_reshape(buffers_rg, devices, detach=detach)
     buffer_copies_not_rg = _broadcast_coalesced_reshape(buffers_not_rg, devices, detach=True)
 
@@ -207,6 +210,8 @@ def replicate(network, devices, detach=False):
     module_copies = [[] for device in devices]
     module_indices = {}
 
+    //--------------------2--------------------
+    //----------replicate modules----------
     for i, module in enumerate(modules):
         module_indices[module] = i
         for j in range(num_replicas):
