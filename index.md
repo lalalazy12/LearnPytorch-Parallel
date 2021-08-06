@@ -324,16 +324,16 @@ def forward(self, *inputs, **kwargs):
 
             Broadcasts a sequence tensors to the specified GPUs. Small tensors are first coalesced into a buffer to reduce the number of synchronizations.
 
-                Args:
-                    tensors (sequence): tensors to broadcast. Must be on the same device, either CPU or GPU. 
+            Args:
+            tensors (sequence): tensors to broadcast. Must be on the same device, either CPU or GPU. 
 
-                    devices (Iterable[torch.device, str or int]): an iterable of GPU devices, among which to broadcast. 
+            devices (Iterable[torch.device, str or int]): an iterable of GPU devices, among which to broadcast. 
 
-                    buffer_size (int): maximum size of the buffer used for coalescing
+            buffer_size (int): maximum size of the buffer used for coalescing
 
-                Returns:
+            Returns:
 
-                    A tuple containing copies of :attr:`tensor`, placed on :attr:`devices`.
+            A tuple containing copies of :attr:`tensor`, placed on :attr:`devices`.
 
             ```
             def broadcast_coalesced(tensors, devices, buffer_size=10485760):
