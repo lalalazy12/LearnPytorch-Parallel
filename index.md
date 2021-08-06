@@ -168,7 +168,7 @@ class Scatter(Function):
         return None, None, None, Gather.apply(ctx.input_device, ctx.dim, *grad_output)
 ```
 
-3. 
+3. Replicate network
 
 
 ```
